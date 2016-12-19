@@ -1,16 +1,32 @@
+// Copyright 2016 The Grin Developers
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Implements storage primitives required by the chain
 
 use byteorder::{WriteBytesExt, BigEndian};
 
 use types::*;
-use core::core::Block;
+use core::core::hash::Hash;
+use core::core::{Block, BlockHeader};
 use grin_store;
 
-const STORE_PATH: &'static str = ".grin/chain";
+const STORE_SUBPATH: &'static str = "chain";
 
 const SEP: u8 = ':' as u8;
 
-const BLOCK_PREFIX: u8 = 'B' as u8;
+const BLOCK_HEADER_PREFIX: u8 = 'h' as u8;
+const BLOCK_PREFIX: u8 = 'b' as u8;
 const TIP_PREFIX: u8 = 'T' as u8;
 const HEAD_PREFIX: u8 = 'H' as u8;
 
@@ -21,8 +37,9 @@ pub struct ChainKVStore {
 }
 
 impl ChainKVStore {
-	pub fn new() -> Result<ChainKVStore, Error> {
-		let db = try!(grin_store::Store::open(STORE_PATH).map_err(to_store_err));
+	pub fn new(root_path: String) -> Result<ChainKVStore, Error> {
+		let db = try!(grin_store::Store::open(format!("{}/{}", root_path, STORE_SUBPATH).as_str())
+			.map_err(to_store_err));
 		Ok(ChainKVStore { db: db })
 	}
 }
@@ -32,20 +49,35 @@ impl ChainStore for ChainKVStore {
 		option_to_not_found(self.db.get_ser(&vec![HEAD_PREFIX]))
 	}
 
-	fn save_block(&self, b: &Block) -> Option<Error> {
-		self.db.put_ser(&to_key(BLOCK_PREFIX, &mut b.hash().to_vec())[..], b).map(&to_store_err)
+	fn head_header(&self) -> Result<BlockHeader, Error> {
+		let head: Tip = try!(option_to_not_found(self.db.get_ser(&vec![HEAD_PREFIX])));
+		self.get_block_header(&head.last_block_h)
 	}
 
-	fn save_head(&self, t: &Tip) -> Option<Error> {
-		try_m!(self.save_tip(t));
-		self.db.put_ser(&vec![HEAD_PREFIX], t).map(&to_store_err)
+	fn save_block(&self, b: &Block) -> Result<(), Error> {
+		try!(self.db
+			.put_ser(&to_key(BLOCK_PREFIX, &mut b.hash().to_vec())[..], b)
+			.map_err(&to_store_err));
+		self.db
+			.put_ser(&to_key(BLOCK_HEADER_PREFIX, &mut b.hash().to_vec())[..],
+			         &b.header)
+			.map_err(&to_store_err)
 	}
 
-	fn save_tip(&self, t: &Tip) -> Option<Error> {
+	fn get_block_header(&self, h: &Hash) -> Result<BlockHeader, Error> {
+		option_to_not_found(self.db.get_ser(&to_key(BLOCK_HEADER_PREFIX, &mut h.to_vec())))
+	}
+
+	fn save_head(&self, t: &Tip) -> Result<(), Error> {
+		try!(self.save_tip(t));
+		self.db.put_ser(&vec![HEAD_PREFIX], t).map_err(&to_store_err)
+	}
+
+	fn save_tip(&self, t: &Tip) -> Result<(), Error> {
 		let last_branch = t.lineage.last_branch();
 		let mut k = vec![TIP_PREFIX, SEP];
 		k.write_u32::<BigEndian>(last_branch);
-		self.db.put_ser(&mut k, t).map(&to_store_err)
+		self.db.put_ser(&mut k, t).map_err(&to_store_err)
 	}
 }
 

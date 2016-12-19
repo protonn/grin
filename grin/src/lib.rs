@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The block chain itself, validates and accepts new blocks, handles reorgs.
+//! Main crate putting together all the other crates that compose Grin into a
+//! binary.
 
 #![deny(non_upper_case_globals)]
 #![deny(non_camel_case_types)]
@@ -21,19 +22,20 @@
 #![warn(missing_docs)]
 
 #[macro_use]
-extern crate bitflags;
-extern crate byteorder;
+extern crate log;
+extern crate env_logger;
+extern crate futures;
+extern crate rand;
 extern crate time;
+extern crate tokio_core;
 
+extern crate grin_chain as chain;
 extern crate grin_core as core;
-extern crate grin_store;
+extern crate grin_p2p as p2p;
+extern crate grin_store as store;
 extern crate secp256k1zkp as secp;
 
-pub mod pipe;
-pub mod store;
-pub mod types;
+mod miner;
+mod server;
 
-// Re-export the base interface
-
-pub use types::{ChainStore, Tip};
-pub use pipe::{NONE, process_block};
+pub use server::{Server, ServerFut, ServerConfig};

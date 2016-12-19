@@ -1,3 +1,17 @@
+// Copyright 2016 The Grin Developers
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 extern crate grin_core;
 extern crate grin_chain;
 extern crate rand;
@@ -8,37 +22,40 @@ use rand::os::OsRng;
 use grin_chain::types::*;
 use grin_core::pow;
 use grin_core::core;
+use grin_core::consensus;
 
 #[test]
 fn mine_empty_chain() {
   let curve = secp::Secp256k1::with_caps(secp::ContextFlag::Commit);
 	let mut rng = OsRng::new().unwrap();
-	let store = grin_chain::store::ChainKVStore::new().unwrap();
+	let store = grin_chain::store::ChainKVStore::new(".grin".to_string()).unwrap();
 
   // save a genesis block
   let gen = grin_core::genesis::genesis(); 
-  assert!(store.save_block(&gen).is_none());
+  store.save_block(&gen).unwrap();
 
   // setup a new head tip
   let tip = Tip::new(gen.hash());
-  assert!(store.save_head(&tip).is_none());
+  store.save_head(&tip).unwrap();
 
   // mine and add a few blocks
   let mut prev = gen;
 	let secp = secp::Secp256k1::with_caps(secp::ContextFlag::Commit);
 	let reward_key = secp::key::SecretKey::new(&secp, &mut rng);
 
-  for n in 1..6 {
-    let mut b = core::Block::new(prev.header, vec![], reward_key).unwrap();
-    println!("=> {} {:?}", b.header.height, b.verify(&curve));
+  for n in 1..4 {
+    let mut b = core::Block::new(&prev.header, vec![], reward_key).unwrap();
 
-    let (proof, nonce) = pow::pow20(&b, core::Proof(pow::MAX_TARGET)).unwrap();
+    let (diff_target, _) = consensus::next_target(b.header.timestamp.to_timespec().sec,
+                                                      prev.header.timestamp.to_timespec().sec,
+                                                      prev.header.target,
+                                                      prev.header.cuckoo_len);
+
+    let (proof, nonce) = pow::pow_size(&b, diff_target, 15).unwrap();
     b.header.pow = proof;
     b.header.nonce = nonce;
-    if let Some(e) = grin_chain::pipe::process_block(&b, &store, grin_chain::pipe::EASY_POW) {
-      println!("err: {:?}", e);
-      panic!();
-    }
+    b.header.target = diff_target;
+    grin_chain::pipe::process_block(&b, &store, grin_chain::pipe::EASY_POW).unwrap();
 
     // checking our new head
     let head = store.head().unwrap();

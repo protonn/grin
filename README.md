@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ignopeverell/grin.svg?branch=master)](https://travis-ci.org/ignopeverell/grin) [![Gitter chat](https://badges.gitter.im/grin_community/Lobby.png)](https://gitter.im/grin_community/Lobby)
+
 # Grin
 
 Grin is an in-progress implementation of the MimbleWimble protocol. Many characteristics are still undefined but the following constitutes a first set of choices:
@@ -20,7 +22,11 @@ Find an area you can help with and do it. Open source is about collaboration and
 
 Additional tests are rewarded with an immense amount of positive karma. So is documentation.
 
-Find us on Gitter: https://gitter.im/grin_community/Lobby
+Find us:
+
+* IRC: [#MimbleWimble](https://webchat.freenode.net/?channels=#MimbleWimble) on Freenode.
+* Mailing list: join the [~MimbleWimble team](https://launchpad.net/~mimblewimble) and subscribe on Launchpad.
+
 
 ## Philosophy
 

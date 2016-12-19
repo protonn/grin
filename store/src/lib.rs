@@ -1,3 +1,17 @@
+// Copyright 2016 The Grin Developers
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Storage of core types using RocksDB.
 
 #![deny(non_upper_case_globals)]
@@ -49,18 +63,18 @@ impl Store {
 	}
 
 	/// Writes a single key/value pair to the db
-	pub fn put(&self, key: &[u8], value: Vec<u8>) -> Option<Error> {
+	pub fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
 		let db = self.rdb.write().unwrap();
-		db.put(key, &value[..]).err().map(Error::RocksDbErr)
+		db.put(key, &value[..]).map_err(Error::RocksDbErr)
 	}
 
 	/// Writes a single key and its `Writeable` value to the db. Encapsulates
 	/// serialization.
-	pub fn put_ser(&self, key: &[u8], value: &ser::Writeable) -> Option<Error> {
+	pub fn put_ser(&self, key: &[u8], value: &ser::Writeable) -> Result<(), Error> {
 		let ser_value = ser::ser_vec(value);
 		match ser_value {
 			Ok(data) => self.put(key, data),
-			Err(err) => Some(Error::SerErr(err)),
+			Err(err) => Err(Error::SerErr(err)),
 		}
 	}
 
@@ -73,10 +87,16 @@ impl Store {
 	/// Gets a `Readable` value from the db, provided its key. Encapsulates
 	/// serialization.
 	pub fn get_ser<T: ser::Readable<T>>(&self, key: &[u8]) -> Result<Option<T>, Error> {
+    self.get_ser_limited(key, 0)
+	}
+
+	/// Gets a `Readable` value from the db, provided its key, allowing to extract only partial data. The underlying Readable size must align accordingly. Encapsulates serialization.
+	pub fn get_ser_limited<T: ser::Readable<T>>(&self, key: &[u8], len: usize) -> Result<Option<T>, Error> {
 		let data = try!(self.get(key));
 		match data {
 			Some(val) => {
-				let r = try!(ser::deserialize(&mut &val[..]).map_err(Error::SerErr));
+        let mut lval = if len > 0 { &val[..len] } else { &val[..] };
+				let r = try!(ser::deserialize(&mut lval).map_err(Error::SerErr));
 				Ok(Some(r))
 			}
 			None => Ok(None),
@@ -84,8 +104,8 @@ impl Store {
 	}
 
 	/// Deletes a key/value pair from the db
-	pub fn delete(&self, key: &[u8]) -> Option<Error> {
+	pub fn delete(&self, key: &[u8]) -> Result<(), Error> {
 		let db = self.rdb.write().unwrap();
-		db.delete(key).err().map(Error::RocksDbErr)
+		db.delete(key).map_err(Error::RocksDbErr)
 	}
 }

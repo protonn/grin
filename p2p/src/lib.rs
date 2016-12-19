@@ -12,28 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The block chain itself, validates and accepts new blocks, handles reorgs.
+//! Networking code to connect to other peers and exchange block, transactions,
+//! etc.
 
 #![deny(non_upper_case_globals)]
 #![deny(non_camel_case_types)]
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
-#![warn(missing_docs)]
 
 #[macro_use]
 extern crate bitflags;
-extern crate byteorder;
-extern crate time;
-
+#[macro_use]
+extern crate enum_primitive;
+#[macro_use]
 extern crate grin_core as core;
-extern crate grin_store;
-extern crate secp256k1zkp as secp;
+#[macro_use]
+extern crate log;
+extern crate futures;
+#[macro_use]
+extern crate tokio_core;
+extern crate rand;
+extern crate time;
+extern crate num;
 
-pub mod pipe;
-pub mod store;
-pub mod types;
+pub mod handshake;
+mod msg;
+mod peer;
+mod protocol;
+mod server;
+mod types;
 
-// Re-export the base interface
-
-pub use types::{ChainStore, Tip};
-pub use pipe::{NONE, process_block};
+pub use server::{Server, DummyAdapter};
+pub use peer::Peer;
+pub use types::P2PConfig;

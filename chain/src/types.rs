@@ -1,6 +1,21 @@
+// Copyright 2016 The Grin Developers
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Base types that the block chain pipeline requires.
 
-use core::core::{Hash, Block};
+use core::core::hash::Hash;
+use core::core::{Block, BlockHeader};
 use core::ser;
 
 /// The lineage of a fork, defined as a series of numbers. Each new branch gets
@@ -26,12 +41,12 @@ impl Lineage {
 
 /// Serialization for lineage, necessary to serialize fork tips.
 impl ser::Writeable for Lineage {
-	fn write(&self, writer: &mut ser::Writer) -> Option<ser::Error> {
-		try_m!(writer.write_u32(self.0.len() as u32));
+	fn write(&self, writer: &mut ser::Writer) -> Result<(), ser::Error> {
+		try!(writer.write_u32(self.0.len() as u32));
 		for num in &self.0 {
-			try_m!(writer.write_u32(*num));
+			try!(writer.write_u32(*num));
 		}
-		None
+		Ok(())
 	}
 }
 /// Deserialization for lineage, necessary to deserialize fork tips.
@@ -85,10 +100,10 @@ impl Tip {
 
 /// Serialization of a tip, required to save to datastore.
 impl ser::Writeable for Tip {
-	fn write(&self, writer: &mut ser::Writer) -> Option<ser::Error> {
-		try_m!(writer.write_u64(self.height));
-		try_m!(writer.write_fixed_bytes(&self.last_block_h));
-		try_m!(writer.write_fixed_bytes(&self.prev_block_h));
+	fn write(&self, writer: &mut ser::Writer) -> Result<(), ser::Error> {
+		try!(writer.write_u64(self.height));
+		try!(writer.write_fixed_bytes(&self.last_block_h));
+		try!(writer.write_fixed_bytes(&self.prev_block_h));
 		self.lineage.write(writer)
 	}
 }
@@ -118,16 +133,22 @@ pub enum Error {
 
 /// Trait the chain pipeline requires an implementor for in order to process
 /// blocks.
-pub trait ChainStore {
+pub trait ChainStore: Send {
 	/// Get the tip that's also the head of the chain
 	fn head(&self) -> Result<Tip, Error>;
 
+	/// Block header for the chain head
+	fn head_header(&self) -> Result<BlockHeader, Error>;
+
+	/// Gets a block header by hash
+	fn get_block_header(&self, h: &Hash) -> Result<BlockHeader, Error>;
+
 	/// Save the provided block in store
-	fn save_block(&self, b: &Block) -> Option<Error>;
+	fn save_block(&self, b: &Block) -> Result<(), Error>;
 
 	/// Save the provided tip as the current head of our chain
-	fn save_head(&self, t: &Tip) -> Option<Error>;
+	fn save_head(&self, t: &Tip) -> Result<(), Error>;
 
 	/// Save the provided tip without setting it as head
-	fn save_tip(&self, t: &Tip) -> Option<Error>;
+	fn save_tip(&self, t: &Tip) -> Result<(), Error>;
 }
